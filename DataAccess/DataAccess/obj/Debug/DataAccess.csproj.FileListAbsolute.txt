@@ -1,0 +1,6 @@
+E:\Project\myProject\DataAccess\DataAccess\DataAccess\obj\Debug\DataAccess.csprojResolveAssemblyReference.cache
+E:\Project\myProject\DataAccess\DataAccess\DataAccess\bin\Debug\DataAccess.dll
+E:\Project\myProject\DataAccess\DataAccess\DataAccess\bin\Debug\DataAccess.pdb
+E:\Project\myProject\DataAccess\DataAccess\DataAccess\bin\Debug\MySql.Data.dll
+E:\Project\myProject\DataAccess\DataAccess\DataAccess\obj\Debug\DataAccess.dll
+E:\Project\myProject\DataAccess\DataAccess\DataAccess\obj\Debug\DataAccess.pdb
