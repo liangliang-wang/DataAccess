@@ -12,7 +12,7 @@ namespace DataAccess.FrameWork
     /// 实体查询框架
     /// </summary>
     /// <typeparam name="T">类型T</typeparam>
-    public class EntityFrameWork<T> where T : class, new()
+    public class EntityFrameWork<T> where T : BaseEntity<T>, new()
     {
         private DBType dbType;
 
@@ -336,6 +336,34 @@ namespace DataAccess.FrameWork
         public int Add<Tentity>(Tentity entity, string dbConnectionString) where Tentity : BaseEntity<Tentity>, new()
         {
             var sql = entity.GetInsertSql();
+            return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
+        }
+
+        /// <summary>
+        /// 更新
+        /// </summary>
+        /// <typeparam name="Tentity"></typeparam>
+        /// <param name="entity"></param>
+        /// <param name="dbConnectionString"></param>
+        /// <returns></returns>
+        public int Update<Tentity>(Tentity entity, string dbConnectionString) where Tentity : BaseEntity<Tentity>, new()
+        {
+            var sql = entity.GetUpdateSql();
+            return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
+        }
+
+
+        /// <summary>
+        /// 更新
+        /// </summary>
+        /// <typeparam name="Tentity"></typeparam>
+        /// <param name="entity">实体</param>
+        /// <param name="dbConnectionString">数据库连接字符串</param>
+        /// <param name="onlyUpdate">仅更新那些字段</param>
+        /// <returns></returns>
+        public int Update(T entity, string dbConnectionString,List<string> onlyUpdate)
+        {
+            var sql = entity.GetUpdateSql(onlyUpdate);
             return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
         }
     }
