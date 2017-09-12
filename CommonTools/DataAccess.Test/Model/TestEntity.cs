@@ -14,8 +14,11 @@ namespace DataAccess.Test.Model
         public string DBName = "artoffuture";
 
         [DBField(FieldName = "PK")]
-        [PrimaryKey]
         public string Pk { set; get; }
+
+        [DBField(FieldName = "PK")]
+        [PrimaryKey]
+        public string OldPk { set; get; }
 
         [DBField(FieldName = "BrokerID")]
         public string Password { set; get; }

@@ -3,6 +3,7 @@ using DataAccess.Model;
 using MySql.Data.MySqlClient;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Data;
 using System.Data.SqlClient;
 
@@ -333,7 +334,7 @@ namespace DataAccess.FrameWork
         /// <param name="entity"></param>
         /// <param name="dbConnectionString"></param>
         /// <returns></returns>
-        public int Add<Tentity>(Tentity entity, string dbConnectionString) where Tentity : BaseEntity<Tentity>, new()
+        public int Add(T entity, string dbConnectionString)
         {
             var sql = entity.GetInsertSql();
             return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
@@ -346,7 +347,7 @@ namespace DataAccess.FrameWork
         /// <param name="entity"></param>
         /// <param name="dbConnectionString"></param>
         /// <returns></returns>
-        public int Update<Tentity>(Tentity entity, string dbConnectionString) where Tentity : BaseEntity<Tentity>, new()
+        public int Update(T entity, string dbConnectionString)
         {
             var sql = entity.GetUpdateSql();
             return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
@@ -361,9 +362,76 @@ namespace DataAccess.FrameWork
         /// <param name="dbConnectionString">数据库连接字符串</param>
         /// <param name="onlyUpdate">仅更新那些字段</param>
         /// <returns></returns>
-        public int Update(T entity, string dbConnectionString,List<string> onlyUpdate)
+        public int Update(T entity, string dbConnectionString, List<string> onlyUpdate)
         {
             var sql = entity.GetUpdateSql(onlyUpdate);
+            return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
+        }
+
+        /// <summary>
+        /// 列表查询（单表）
+        /// </summary>
+        /// <param name="dbConnectionString"></param>
+        /// <param name="param"></param>
+        /// <param name="dp"></param>
+        /// <returns></returns>
+        public List<T> List(string dbConnectionString, Dictionary<string, object> param, DataPage dp = null)
+        {
+            var sql = new T().GetSelectSql();
+            Dictionary<string, object> newParam = new Dictionary<string, object>();
+            if (param != null && param.Count > 0)
+            {
+                sql += " where 1=1 ";
+                int index = 0;
+                foreach (var paramItem in param)
+                {
+                    var par = GetCondition(paramItem.Key);
+                    var paramName = "@Param" + ++index;
+                    sql += string.Format(" and {0} {1} {2}", par.Item2, par.Item1, paramName);
+                    newParam.Add(paramName, paramItem.Value);
+                }
+            }
+            FrameWorkItem item = new FrameWorkItem
+            {
+                Sql = sql,
+                SqlParam = newParam,
+                ConnectionString = dbConnectionString
+            };
+            return SelectList(item, dp);
+        }
+
+        /// <summary>
+        /// 获取比较符
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        private static Tuple<string, string> GetCondition(string key)
+        {
+            var result = "=";
+            var name = key;
+            if (key[key.Length - 2] < 'A')
+            {
+                name = key.Substring(0, key.Length - 2);
+                result = key.Substring(key.Length - 2);
+            }
+            else if (key[key.Length - 1] < 'A')
+            {
+                name = key.Substring(0, key.Length - 1);
+                result = key.Substring(key.Length - 1);
+            }
+            return new Tuple<string, string>(result, name);
+        }
+
+        /// <summary>
+        /// 根据主键硬删除
+        /// </summary>
+        /// <param name="pk"></param>
+        /// <param name="dbConnectionString"></param>
+        /// <returns></returns>
+        public int DeleteByKey(string pk, string dbConnectionString)
+        {
+            var entity = new T();
+            var sql = entity.GetDeleteSql(pk);
             return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
         }
     }

@@ -55,7 +55,6 @@ namespace HelpTools.Helpers
         public static string GetRequest(string remoteUrl, int timeOut = 30000, string encode = "UTF-8")
         {
             var result = string.Empty;
-
             var mRequest = (HttpWebRequest)WebRequest.Create(remoteUrl);
             mRequest.Timeout = timeOut;
             var mResponse = (HttpWebResponse)mRequest.GetResponse();

@@ -21,6 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\DataAccess.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -52,6 +53,8 @@
     <Compile Include="FrameWork\DynamicBuilderEntity.cs" />
     <Compile Include="FrameWork\EntityFrameWork.cs" />
     <Compile Include="FrameWork\FrameWorkItem.cs" />
+    <Compile Include="ModelT4\DbField.cs" />
+    <Compile Include="ModelT4\T4Base.cs" />
     <Compile Include="Model\BaseEntity.cs" />
     <Compile Include="Model\DataPage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -62,5 +65,6 @@
     <Compile Include="Toos\TypeParse.cs" />
     <Compile Include="Toos\XmlHelper.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
