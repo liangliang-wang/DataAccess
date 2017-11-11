@@ -12,5 +12,15 @@ namespace DataAccess.Attributes
 	[AttributeUsage(AttributeTargets.Property, Inherited = true)]
     public class PrimaryKeyAttribute : Attribute
     {
+        /// <summary>构造</summary>
+        /// <param name="isIdentity"></param>
+        public PrimaryKeyAttribute(bool isIdentity = false)
+        {
+            this.IsIdentity = isIdentity;
+        }
+        /// <summary>
+        /// 是否自增
+        /// </summary>
+        public bool IsIdentity { set; get; }
     }
 }

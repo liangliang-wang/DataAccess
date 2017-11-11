@@ -46,10 +46,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Attributes\DBFieldAttribute.cs" />
+    <Compile Include="Attributes\DataBaseAttribute.cs" />
     <Compile Include="Attributes\EntityAttribute.cs" />
     <Compile Include="Attributes\PrimaryKeyAttribute.cs" />
     <Compile Include="Enums\DBType.cs" />
     <Compile Include="FrameWork\DalAid.cs" />
+    <Compile Include="FrameWork\DalHelper.cs" />
     <Compile Include="FrameWork\DynamicBuilderEntity.cs" />
     <Compile Include="FrameWork\EntityFrameWork.cs" />
     <Compile Include="FrameWork\FrameWorkItem.cs" />

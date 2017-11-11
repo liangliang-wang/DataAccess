@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace DataAccess.Model
 {
@@ -11,12 +12,32 @@ namespace DataAccess.Model
     /// <typeparam name="T"></typeparam>
     public class BaseEntity<T> where T : class, new()
     {
-        private string _tableName = string.Empty;
+        private string _dbName = string.Empty;
+        /// <summary>
+        /// 库名
+        /// </summary>
+        internal string DBName
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_dbName))
+                {
+                    var type = this.GetType();
+                    var attribute = type.GetCustomAttributes(typeof(DataBaseAttribute), false).FirstOrDefault();
+                    if (attribute != null)
+                    {
+                        _dbName = ((DataBaseAttribute)attribute).DBName;
+                    }
+                }
+                return _dbName;
+            }
+        }
 
+        private string _tableName = string.Empty;
         /// <summary>
         /// 表名
         /// </summary>
-        public string TableName
+        internal string TableName
         {
             get
             {
@@ -34,11 +55,10 @@ namespace DataAccess.Model
         }
 
         private string _pkName = string.Empty;
-
         /// <summary>
         /// 主键名
         /// </summary>
-        public string PkName
+        internal string PkName
         {
             get
             {
@@ -64,7 +84,6 @@ namespace DataAccess.Model
                 return _pkName;
             }
         }
-
 
         private string _pkFileName = string.Empty;
         /// <summary>
@@ -133,6 +152,10 @@ namespace DataAccess.Model
             var propertise = type.GetProperties();
             foreach (var item in propertise)
             {
+                if (IsPkIdentity(item))
+                {
+                    continue;
+                }
                 var attrs = item.GetCustomAttributes(typeof(DBFieldAttribute), false);
                 if (attrs.Count() > 0)
                 {
@@ -148,6 +171,25 @@ namespace DataAccess.Model
             }
             sql = string.Format("insert into {0} ({1}) values({2})", TableName, string.Join(",", values), string.Join(",", param));
             return new Tuple<string, Dictionary<string, object>>(sql, paramDic);
+        }
+
+        /// <summary>
+        /// 是否主键自增
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        private bool IsPkIdentity(PropertyInfo item)
+        {
+            var attrs = item.GetCustomAttributes(typeof(PrimaryKeyAttribute), false);
+            if (attrs.Count() > 0)
+            {
+                var attr = attrs[0] as PrimaryKeyAttribute;
+                if (attr.IsIdentity)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

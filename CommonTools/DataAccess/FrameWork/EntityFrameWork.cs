@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Data;
+using System.Data.Common;
 using System.Data.SqlClient;
 
 namespace DataAccess.FrameWork
@@ -17,7 +18,7 @@ namespace DataAccess.FrameWork
     {
         private DBType dbType;
 
-        private Dictionary<DBType, Func<string, string, Dictionary<string, object>, IDbCommand>> commandDic = new Dictionary<DBType, Func<string, string, Dictionary<string, object>, IDbCommand>>();
+        private DbConnection dbConn = null;
 
         /// <summary>
         /// 构造函数
@@ -26,9 +27,6 @@ namespace DataAccess.FrameWork
         public EntityFrameWork(DBType dbType)
         {
             this.dbType = dbType;
-            commandDic.Add(DBType.MYSQL, GetMySqlCommand);
-            commandDic.Add(DBType.SQLSERVER, GetMSSqlCommand);
-
         }
 
         /// <summary>
@@ -38,13 +36,21 @@ namespace DataAccess.FrameWork
         /// <returns>单个对象</returns>
         public T SelectModel(FrameWorkItem item)
         {
-            IDataReader dr = null;
             try
             {
-                dr = BuildDataReader(item);
-                if (dr != null && dr.Read())
+                var sql = DalAid.CreatePageQuerySql(item.Sql, null, dbType);
+                using (var connection = GetDbConnection(item.ConnectionString))
                 {
-                    return DynamicBuilderEntity<T>.CreateBuilder(dr).Build(dr);
+                    using (var cmd = GetDbCommand(sql, connection, item.SqlParam))
+                    {
+                        using (IDataReader dr = cmd.ExecuteReader())
+                        {
+                            if (dr != null && dr.Read())
+                            {
+                                return DynamicBuilderEntity<T>.CreateBuilder(dr).Build(dr);
+                            }
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -53,8 +59,7 @@ namespace DataAccess.FrameWork
             }
             finally
             {
-                if (dr != null)
-                    dr.Close();
+
             }
             return default(T);
         }
@@ -65,26 +70,33 @@ namespace DataAccess.FrameWork
         /// <param name="item">框架实体</param>
         /// <param name="dp">分页对象</param>
         /// <returns>对象集合</returns>
-        public List<T> SelectList(FrameWorkItem item, DataPage dp = null)
+        public List<To> SelectList<To>(FrameWorkItem item, DataPage dp = null) where To : new()
         {
-            IDataReader dr = null;
             try
             {
-                dr = BuildDataReader(item, dp);
-
-                List<T> list = new List<T>();
-                if (dp != null && dp.PageSize > 0)
+                var sql = DalAid.CreatePageQuerySql(item.Sql, null, dbType);
+                using (var connection = GetDbConnection(item.ConnectionString))
                 {
-                    int result = GetResult<int>(string.Format("SELECT COUNT(1) FROM ({0}) a", item.Sql), item.ConnectionString, item.SqlParam);
-                    dp.RowCount = result;
+                    using (var cmd = GetDbCommand(sql, connection, item.SqlParam))
+                    {
+                        using (IDataReader dr = cmd.ExecuteReader())
+                        {
+                            List<To> list = new List<To>();
+                            if (dp != null && dp.PageSize > 0)
+                            {
+                                int result = GetResult<int>(string.Format("SELECT COUNT(1) FROM ({0}) a", item.Sql), item.ConnectionString, item.SqlParam);
+                                dp.RowCount = result;
+                            }
+                            while (dr != null && dr.Read())
+                            {
+                                To tempT = new To();
+                                tempT = DynamicBuilderEntity<To>.CreateBuilder(dr).Build(dr);
+                                list.Add(tempT);
+                            }
+                            return list;
+                        }
+                    }
                 }
-                while (dr != null && dr.Read())
-                {
-                    T tempT = new T();
-                    tempT = DynamicBuilderEntity<T>.CreateBuilder(dr).Build(dr);
-                    list.Add(tempT);
-                }
-                return list;
             }
             catch (Exception ex)
             {
@@ -92,8 +104,7 @@ namespace DataAccess.FrameWork
             }
             finally
             {
-                if (dr != null)
-                    dr.Close();
+
             }
         }
 
@@ -105,17 +116,25 @@ namespace DataAccess.FrameWork
         /// <returns></returns>
         public DataTable SelectDataTable(FrameWorkItem item, DataPage dp = null)
         {
-            IDataReader dr = null;
             DataTable result = new DataTable();
             try
             {
-                dr = BuildDataReader(item, dp);
-                var datasSet = dr.ToDataSet();
-                if (datasSet.Tables.Count > 0)
+                var sql = DalAid.CreatePageQuerySql(item.Sql, dp, dbType);
+                using (var connection = GetDbConnection(item.ConnectionString))
                 {
-                    result = datasSet.Tables[0];
+                    using (var cmd = GetDbCommand(sql, connection, item.SqlParam))
+                    {
+                        using (IDataReader dr = cmd.ExecuteReader())
+                        {
+                            var datasSet = dr.ToDataSet();
+                            if (datasSet.Tables.Count > 0)
+                            {
+                                result = datasSet.Tables[0];
+                            }
+                            return result;
+                        }
+                    }
                 }
-                return result;
             }
             catch (Exception ex)
             {
@@ -123,24 +142,8 @@ namespace DataAccess.FrameWork
             }
             finally
             {
-                if (dr != null)
-                    dr.Close();
-            }
-        }
 
-        /// <summary>
-        /// 根据框架实体，条件式的选用sqlhelper
-        /// </summary>
-        /// <param name="item">框架实体</param>
-        /// <param name="dp">分页</param>
-        /// <returns>IDataReader</returns>
-        private IDataReader BuildDataReader(FrameWorkItem item, DataPage dp = null)
-        {
-            var sql = DalAid.CreatePageQuerySql(item.Sql, dp, dbType);
-            var connection = new MySqlConnection(item.ConnectionString);
-            var cmd = GetCommand(sql, item.ConnectionString, item.SqlParam);
-            var cnt = cmd.ExecuteReader();
-            return cnt;
+            }
         }
 
         /// <summary>
@@ -195,42 +198,36 @@ namespace DataAccess.FrameWork
             DataSet dataSet = new DataSet();
             try
             {
-                using (var cmd = GetCommand(sql, dBConnectionString, cmdParms))
+                using (var connection = GetDbConnection(dBConnectionString))
                 {
-                    if (cmd != null)
+                    using (var cmd = GetDbCommand(sql, connection, cmdParms))
                     {
-                        using (IDataReader dataReader = cmd.ExecuteReader())
+                        if (cmd != null)
                         {
-                            dataSet = dataReader.ToDataSet();
+                            using (IDataReader dataReader = cmd.ExecuteReader())
+                            {
+                                dataSet = dataReader.ToDataSet();
+                            }
                         }
                     }
-
                 }
+                //using (var cmd = GetCommand(sql, dBConnectionString, cmdParms))
+                //{
+                //    if (cmd != null)
+                //    {
+                //        using (IDataReader dataReader = cmd.ExecuteReader())
+                //        {
+                //            dataSet = dataReader.ToDataSet();
+                //        }
+                //    }
+
+                //}
             }
             catch (Exception ex)
             {
                 throw new Exception(ex.Message + "\r\n" + sql);
             }
             return dataSet;
-        }
-
-        /// <summary>
-        /// 获取数据库cmd
-        /// </summary>
-        /// <param name="sql">sql</param>
-        /// <param name="dbConnectionString">数据库连接</param>
-        /// <param name="cmdParms">参数</param>
-        /// <returns>IDbCommand</returns>
-        private IDbCommand GetCommand(string sql, string dbConnectionString, Dictionary<string, object> cmdParms)
-        {
-            if (commandDic.ContainsKey(dbType))
-            {
-                return commandDic[dbType](sql, dbConnectionString, cmdParms);
-            }
-            else
-            {
-                return null;
-            }
         }
 
         /// <summary>
@@ -277,6 +274,52 @@ namespace DataAccess.FrameWork
             return cmd;
         }
 
+        private DbConnection GetDbConnection(string dbConnectionString)
+        {
+            DbConnection connection = null;
+            if (dbType == DBType.MYSQL)
+            {
+                connection = new MySqlConnection(dbConnectionString);
+            }
+            else if (dbType == DBType.SQLSERVER)
+            {
+                connection = new SqlConnection(dbConnectionString);
+            }
+            return connection;
+        }
+
+        private IDbCommand GetDbCommand(string sql, DbConnection connection, Dictionary<string, object> cmdParms)
+        {
+            if (dbType == DBType.MYSQL)
+            {
+                MySqlConnection mysqlConnection = connection as MySqlConnection;
+                var cmd = new MySqlCommand(sql, mysqlConnection);
+                if (cmdParms != null)
+                {
+                    foreach (var item in cmdParms)
+                    {
+                        cmd.Parameters.AddWithValue(item.Key, item.Value);
+                    }
+                }
+                if (connection.State != ConnectionState.Open)
+                    connection.Open();
+                return cmd;
+            }
+            else
+            {
+                SqlConnection con = connection as SqlConnection;
+                var cmd = new SqlCommand(sql, con);
+                if (cmdParms != null)
+                {
+                    foreach (var item in cmdParms)
+                    {
+                        cmd.Parameters.AddWithValue(item.Key, item.Value);
+                    }
+                }
+                return cmd;
+            }
+        }
+
         /// <summary>
         /// 执行sql 返回响应行数
         /// </summary>
@@ -287,11 +330,14 @@ namespace DataAccess.FrameWork
             int result = 0;
             try
             {
-                using (var cmd = GetCommand(item.Sql, item.ConnectionString, item.SqlParam))
+                using (var connection = GetDbConnection(item.ConnectionString))
                 {
-                    if (cmd != null)
+                    using (var cmd = GetDbCommand(item.Sql, connection, item.SqlParam))
                     {
-                        result = cmd.ExecuteNonQuery();
+                        if (cmd != null)
+                        {
+                            result = cmd.ExecuteNonQuery();
+                        }
                     }
                 }
             }
@@ -309,16 +355,26 @@ namespace DataAccess.FrameWork
         /// <returns>结果</returns>
         public object ExecuteScalar(FrameWorkItem item)
         {
-            object result = null; ;
+            object result = null;
             try
             {
-                using (var cmd = GetCommand(item.Sql, item.ConnectionString, item.SqlParam))
+                using (var connection = GetDbConnection(item.ConnectionString))
                 {
-                    if (cmd != null)
+                    using (var cmd = GetDbCommand(item.Sql, connection, item.SqlParam))
                     {
-                        result = cmd.ExecuteScalar();
+                        if (cmd != null)
+                        {
+                            result = cmd.ExecuteScalar();
+                        }
                     }
                 }
+                //using (var cmd = GetCommand(item.Sql, item.ConnectionString, item.SqlParam))
+                //{
+                //    if (cmd != null)
+                //    {
+                //        result = cmd.ExecuteScalar();
+                //    }
+                //}
             }
             catch (Exception ex)
             {
@@ -352,7 +408,6 @@ namespace DataAccess.FrameWork
             var sql = entity.GetUpdateSql();
             return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
         }
-
 
         /// <summary>
         /// 更新
@@ -397,7 +452,7 @@ namespace DataAccess.FrameWork
                 SqlParam = newParam,
                 ConnectionString = dbConnectionString
             };
-            return SelectList(item, dp);
+            return SelectList<T>(item, dp);
         }
 
         /// <summary>
