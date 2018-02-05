@@ -68,16 +68,24 @@ namespace DataAccess.FrameWork
         /// 查询集合，带分页
         /// </summary>
         /// <param name="item">框架实体</param>
+        /// <param name="isAutoParam">是否自动匹配参数</param>
         /// <param name="dp">分页对象</param>
         /// <returns>对象集合</returns>
-        public List<To> SelectList<To>(FrameWorkItem item, DataPage dp = null) where To : new()
+        public List<To> SelectList<To>(FrameWorkItem item, DataPage dp = null, bool isAutoParam = false) where To : new()
         {
             try
             {
-                var sql = DalAid.CreatePageQuerySql(item.Sql, null, dbType);
+                var sql = DalAid.CreatePageQuerySql(item.Sql, dp, dbType);
+                var param = item.SqlParam;
+                if (isAutoParam)
+                {
+                    var where = GetWhere(item.SqlParam);
+                    sql += where.Item1;
+                    param = where.Item2;
+                }
                 using (var connection = GetDbConnection(item.ConnectionString))
                 {
-                    using (var cmd = GetDbCommand(sql, connection, item.SqlParam))
+                    using (var cmd = GetDbCommand(sql, connection, param))
                     {
                         using (IDataReader dr = cmd.ExecuteReader())
                         {
@@ -87,10 +95,11 @@ namespace DataAccess.FrameWork
                                 int result = GetResult<int>(string.Format("SELECT COUNT(1) FROM ({0}) a", item.Sql), item.ConnectionString, item.SqlParam);
                                 dp.RowCount = result;
                             }
+                            var builders = DynamicBuilderEntity<To>.CreateBuilder(dr);
                             while (dr != null && dr.Read())
                             {
                                 To tempT = new To();
-                                tempT = DynamicBuilderEntity<To>.CreateBuilder(dr).Build(dr);
+                                tempT = builders.Build(dr);
                                 list.Add(tempT);
                             }
                             return list;
@@ -325,7 +334,7 @@ namespace DataAccess.FrameWork
         /// </summary>
         /// <param name="item">参数</param>
         /// <returns>结果</returns>
-        public int ExecuteNonQuery(FrameWorkItem item)
+        public int ExecuteNonQuery(FrameWorkItem item, bool isAdd = false)
         {
             int result = 0;
             try
@@ -336,6 +345,10 @@ namespace DataAccess.FrameWork
                     {
                         if (cmd != null)
                         {
+                            if (isAdd)
+                            {
+                                cmd.CommandText += GetIdentitySql();
+                            }
                             result = cmd.ExecuteNonQuery();
                         }
                     }
@@ -353,7 +366,7 @@ namespace DataAccess.FrameWork
         /// </summary>
         /// <param name="item">参数</param>
         /// <returns>结果</returns>
-        public object ExecuteScalar(FrameWorkItem item)
+        public object ExecuteScalar(FrameWorkItem item, bool isAdd = false)
         {
             object result = null;
             try
@@ -364,17 +377,14 @@ namespace DataAccess.FrameWork
                     {
                         if (cmd != null)
                         {
+                            if (isAdd)
+                            {
+                                cmd.CommandText += GetIdentitySql();
+                            }
                             result = cmd.ExecuteScalar();
                         }
                     }
                 }
-                //using (var cmd = GetCommand(item.Sql, item.ConnectionString, item.SqlParam))
-                //{
-                //    if (cmd != null)
-                //    {
-                //        result = cmd.ExecuteScalar();
-                //    }
-                //}
             }
             catch (Exception ex)
             {
@@ -389,11 +399,11 @@ namespace DataAccess.FrameWork
         /// <typeparam name="Tentity"></typeparam>
         /// <param name="entity"></param>
         /// <param name="dbConnectionString"></param>
-        /// <returns></returns>
-        public int Add(T entity, string dbConnectionString)
+        /// <returns>主键</returns>
+        public object Add(T entity, string dbConnectionString)
         {
             var sql = entity.GetInsertSql();
-            return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
+            return ExecuteScalar(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 }, true);
         }
 
         /// <summary>
@@ -488,6 +498,41 @@ namespace DataAccess.FrameWork
             var entity = new T();
             var sql = entity.GetDeleteSql(pk);
             return ExecuteNonQuery(new FrameWorkItem { Sql = sql.Item1, ConnectionString = dbConnectionString, SqlParam = sql.Item2 });
+        }
+
+        private Tuple<string, Dictionary<string, object>> GetWhere(Dictionary<string, object> param)
+        {
+            var setStr = string.Empty;
+            var paramDic = new Dictionary<string, object>();
+            if (param != null && param.Count > 0)
+            {
+                setStr += " where 1=1 ";
+                int index = 0;
+                foreach (var paramItem in param)
+                {
+                    var par = GetCondition(paramItem.Key);
+                    var paramName = "@Param" + ++index;
+                    setStr += string.Format(" and {0} {1} {2}", par.Item2, par.Item1, paramName);
+                    paramDic.Add(paramName, paramItem.Value);
+                }
+            }
+            setStr = setStr.Trim(',');
+            return new Tuple<string, Dictionary<string, object>>(setStr, paramDic);
+        }
+
+        private string GetIdentitySql()
+        {
+            bool flag = dbType == DBType.SQLSERVER;
+            string result;
+            if (flag)
+            {
+                result = "; SELECT @@IDENTITY ";
+            }
+            else
+            {
+                result = "; SELECT @@IDENTITY From dual ";
+            }
+            return result;
         }
     }
 }

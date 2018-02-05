@@ -1,4 +1,6 @@
 ﻿using DataAccess.Attributes;
+using DataAccess.Enums;
+using DataAccess.FrameWork;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +18,7 @@ namespace DataAccess.Model
         /// <summary>
         /// 库名
         /// </summary>
-        internal string DBName
+        public string DBName
         {
             get
             {
@@ -37,7 +39,7 @@ namespace DataAccess.Model
         /// <summary>
         /// 表名
         /// </summary>
-        internal string TableName
+        public string TableName
         {
             get
             {
@@ -122,20 +124,49 @@ namespace DataAccess.Model
             {
                 if (_pkValue == null)
                 {
-                    string result = string.Empty;
-                    var type = this.GetType();
-                    var propertise = type.GetProperties();
-                    foreach (var item in propertise)
+                    if (pkPropertyInfo == null)
                     {
-                        var attrs = item.GetCustomAttributes(typeof(PrimaryKeyAttribute), false);
-                        if (attrs.Count() > 0)
+                        var type = this.GetType();
+                        var propertise = type.GetProperties();
+                        foreach (var item in propertise)
                         {
-                            _pkValue = item.GetValue(this);
+                            var attrs = item.GetCustomAttributes(typeof(PrimaryKeyAttribute), false);
+                            if (attrs.Count() > 0)
+                            {
+                                pkPropertyInfo = item;
+                                break;
+                            }
                         }
                     }
+                    _pkValue = pkPropertyInfo.GetValue(this);
                 }
                 return _pkValue;
             }
+        }
+
+        private PropertyInfo pkPropertyInfo = null;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="value"></param>
+        public void SetPpValue(object value)
+        {
+            if (pkPropertyInfo == null)
+            {
+                var type = this.GetType();
+                var propertise = type.GetProperties();
+                foreach (var item in propertise)
+                {
+                    var attrs = item.GetCustomAttributes(typeof(PrimaryKeyAttribute), false);
+                    if (attrs.Count() > 0)
+                    {
+                        pkPropertyInfo = item;
+                        break;
+                    }
+                }
+            }
+            pkPropertyInfo.SetValue(this, value);
         }
 
         /// <summary>
